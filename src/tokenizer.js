@@ -1,7 +1,6 @@
+import antlr4 from 'antlr4';
 ace.define('ace/ext/antlr4/tokenizer', ['antlr4/index'], function (require, exports, module) {
   "use strict";
-
-  var antlr4 = require('antlr4/index');
 
   const SkippedAntlrTokenType = -1;
   const DefaultAceTokenType = 'text';
@@ -35,21 +34,28 @@ ace.define('ace/ext/antlr4/tokenizer', ['antlr4/index'], function (require, expo
    *
    * @constructor
    */
-  var Antlr4Tokenizer = function (Lexer, antlrTokenNameToAceTokenType) {
+  var Antlr4Tokenizer = function (Lexer, antlrTokenNameToAceTokenTypeOutside) {
     this.Lexer = Lexer;
-    this.antlrTokenNameToAceTokenType = antlrTokenNameToAceTokenType || {};
+    console.log("Is antlrTokenNameToAceTokenType present?", antlrTokenNameToAceTokenTypeOutside);
+    this.antlrTokenNameToAceTokenType = {};
+    if(antlrTokenNameToAceTokenTypeOutside){
+      this.antlrTokenNameToAceTokenType = antlrTokenNameToAceTokenTypeOutside
+    }
   };
 
   (function () {
     this.getLineTokens = function getLineTokens(line) {
+      console.group("Tokenizer getting tokens");
+      console.log("For the line ", line);
       var stream = new antlr4.InputStream(line + '\n');
       var lexer = new this.Lexer(stream);
-
+      console.log("Lexer stream: ", lexer);
       // added line feed might cause token recognition error
       // that should be ignored (not logged)
       lexer.removeErrorListeners();
 
       var commonTokens = lexer.getAllTokens();
+      console.log('Common tokens: ', commonTokens);
       removeLineFeedOfLastCommonTokenValue(commonTokens);
       var changeTokenTypeToAceType = changeTokenType(
         this.mapAntlrTokenTypeToAceType.bind(this)
@@ -57,6 +63,8 @@ ace.define('ace/ext/antlr4/tokenizer', ['antlr4/index'], function (require, expo
       var tokens = insertSkippedTokens(commonTokens, line)
         .map(mapCommonTokenToAceToken)
         .map(changeTokenTypeToAceType);
+      console.log("The tokens: ", tokens);
+      console.groupEnd();
       return {
         tokens: tokens,
         state: 'start'
@@ -69,7 +77,8 @@ ace.define('ace/ext/antlr4/tokenizer', ['antlr4/index'], function (require, expo
     };
 
     this.mapAntlrTokenNameToAceType = function mapAntlrTokenNameToAceType(tokenName) {
-      return this.antlrTokenNameToAceTokenType[tokenName] || DefaultAceTokenType;
+      var quotedName = "'" + tokenName + "'";
+      return this.antlrTokenNameToAceTokenType[tokenName] || this.antlrTokenNameToAceTokenType[quotedName] || DefaultAceTokenType;
     };
 
     this.mapAntlrTokenTypeToAceType = function mapAntlrTokenTypeToAceType(tokenType) {
@@ -84,7 +93,7 @@ ace.define('ace/ext/antlr4/tokenizer', ['antlr4/index'], function (require, expo
       last.text = last.text.replace('\n', '');
     }
   }
-  
+
   function changeTokenType(mapType) {
     return function (token) {
       token.type = mapType(token.type);
